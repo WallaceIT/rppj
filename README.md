@@ -90,8 +90,12 @@ If not specified in the command line, the default GPIOs <-> PIC connections are:
 - PIC18F46J13*
 - PIC18F26J53*
 - PIC18F46J53*
+- PIC18F27J13*
+- PIC18F27J53*
+- PIC18F47J13*
+- PIC18F47J53*
 
-PLEASE NOTE: do NOT TRY to use rppj with other PIC families: it won't work and this could seriously damage your Raspberry Pi!
+PLEASE NOTE: do NOT TRY to use rppj with other PIC families: it won't work and WILL seriously damage your Raspberry Pi!
 
 # References
 

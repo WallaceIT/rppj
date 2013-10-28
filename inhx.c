@@ -25,9 +25,9 @@
 #include <string.h>
 #include "defs.h"
 
-/* Read a file in Intel HEX 8M format and return a pointer to the picmemory
+/* Read a file in Intel HEX8M or HEX32 format and return a pointer to the picmemory
    struct on success, or NULL on error */
-struct picmemory *read_inhx8m(char *infile, const struct picmicro *pic, uint8_t debug)
+struct picmemory *read_inhx(char *infile, const struct picmicro *pic, uint8_t debug)
 {
         FILE *fp;
         int linenum;
@@ -35,9 +35,11 @@ struct picmemory *read_inhx8m(char *infile, const struct picmicro *pic, uint8_t 
         size_t linelen;
         int nread;
 
-        uint16_t i;
+        uint16_t i=0;
         uint8_t  byte_count;
+        uint16_t base_address = 0x0000;
         uint16_t address;
+        uint32_t extended_address;
         uint8_t  record_type;
         uint16_t data, tmp;
         uint8_t  checksum_calculated;
@@ -104,7 +106,7 @@ struct picmemory *read_inhx8m(char *infile, const struct picmicro *pic, uint8_t 
                                 free_picmemory(&pm);
                                 return NULL;
                         }
-                        if (debug) fprintf(stderr, "  address     = 0x%04X\n", address);
+                        
 
                         nread = sscanf(&line[7], "%2hhx", &record_type);
                         if (nread != 1) {
@@ -113,9 +115,12 @@ struct picmemory *read_inhx8m(char *infile, const struct picmicro *pic, uint8_t 
                                 return NULL;
                         }
 
-                        if (debug) fprintf(stderr, "  record_type = 0x%02X (%s)\n", record_type, record_type == 0 ? "data" : (record_type == 1 ? "EOF" : "Unknown"));
+                        if (debug && record_type != 0x04) fprintf(stderr, "  address     = 0x%04X\n", address);
 
-                        if (record_type != 0 && record_type != 1) {
+                        if (debug)
+                            fprintf(stderr, "  record_type = 0x%02X (%s)\n", record_type, record_type == 0 ? "data" : (record_type == 1 ? "EOF" : (record_type == 0x04 ? "Extended Linear Address" : "Unknown")));
+
+                        if (record_type != 0 && record_type != 1 && record_type != 0x04) {
                                 fprintf(stderr, "Error: unknown record type.\n");
                                 free_picmemory(&pm);
                                 return NULL;
@@ -126,22 +131,33 @@ struct picmemory *read_inhx8m(char *infile, const struct picmicro *pic, uint8_t 
                         checksum_calculated += address & 0xFF;
                         checksum_calculated += record_type;
 
-                        for (i = 0; i < byte_count/2; i++) {
-                                nread = sscanf(&line[9+4*i], "%4hx", &data);
-                                if (nread != 1) {
-                                        fprintf(stderr, "Error: cannot read data.\n");
-                                        free_picmemory(&pm);
-                                        return NULL;
-                                }
-                                tmp = data;
-                                data = (data >> 8) | (tmp << 8);
-                                if (debug) fprintf(stderr, "  data        = 0x%04X\n", data);
-                                checksum_calculated += (data >> 8) & 0xFF;
-                                checksum_calculated += data & 0xFF;
-
-                                pm -> data[address/2 + i]   = data;
-                                pm -> filled[address/2 + i] = 1;
+                        //if we have an extended linear address line
+                        if(record_type == 0x04){
+                            nread = sscanf(&line[9], "%4hx", &base_address);
+                            if (debug) fprintf(stderr, "  NEW BASE ADDRESS     = 0x%04X\n", base_address);
+                            checksum_calculated += (data >> 8) & 0xFF;
+                            checksum_calculated += data & 0xFF;                            
                         }
+
+                        else
+                            for (i = 0; i < byte_count/2; i++) {
+                                    nread = sscanf(&line[9+4*i], "%4hx", &data);
+                                    if (nread != 1) {
+                                            fprintf(stderr, "Error: cannot read data.\n");
+                                            free_picmemory(&pm);
+                                            return NULL;
+                                    }
+                                    tmp = data;
+                                    data = (data >> 8) | (tmp << 8);
+                                    if (debug) fprintf(stderr, "  data        = 0x%04X\n", data);
+                                    checksum_calculated += (data >> 8) & 0xFF;
+                                    checksum_calculated += data & 0xFF;
+
+                                    extended_address = ( (base_address << 16) | address);
+
+                                    pm -> data[extended_address/2 + i]   = data;
+                                    pm -> filled[extended_address/2 + i] = 1;
+                            }
 
                         checksum_calculated = (checksum_calculated ^ 0xFF) + 1;
 
@@ -178,13 +194,14 @@ struct picmemory *read_inhx8m(char *infile, const struct picmicro *pic, uint8_t 
         return pm;
 }
 
-/* Write the filled cells in struct picmemory to a Intel HEX 8M file */
-void write_inhx8m(struct picmemory *pm, char *outfile, const struct picmicro *pic)
+/* Write the filled cells in struct picmemory to a Intel HEX8M or HEX32 file */
+void write_inhx(struct picmemory *pm, char *outfile, const struct picmicro *pic)
 {
         FILE *fp;
         uint32_t base, j, k, start, stop;
         uint8_t  byte_count;
         uint32_t address;
+        uint32_t base_address = 0x0000;
         uint8_t  record_type;
         uint16_t data, tmp;
         uint8_t  checksum;
@@ -206,7 +223,7 @@ void write_inhx8m(struct picmemory *pm, char *outfile, const struct picmicro *pi
             }
             start = j;
 
-            for ( ; j < (pic -> program_memory_size - base -4); j++){
+            for ( ; j < (pic -> program_memory_size - base - 4); j++){
                  if (!pm -> filled[base+j] || (j-start == 8) ) break;
             }
             stop = j;
@@ -216,6 +233,16 @@ void write_inhx8m(struct picmemory *pm, char *outfile, const struct picmicro *pi
             if (byte_count > 0) {
                 address = (base + start)*2;
                 record_type = 0x00;
+
+                if(pic->program_memory_size >= 0x10000 && (address >> 16) != base_address){  //extended linear address
+                        base_address = (address >> 16);
+                        fprintf(fp, ":02000004%04X", base_address);
+                        checksum = 0x06 + ((base_address>>8) & 0xFF) + (base_address & 0xFF);
+                        checksum = (checksum ^ 0xFF) + 1;
+                        fprintf(fp, "%02X\n", checksum);
+                }
+                    
+
                 fprintf(fp, ":%02X%04X%02X", byte_count, address, record_type);
 
                 checksum  = byte_count;
@@ -282,4 +309,3 @@ void write_inhx8m(struct picmemory *pm, char *outfile, const struct picmicro *pi
         fclose(fp);
 
 }
-

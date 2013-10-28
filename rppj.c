@@ -39,6 +39,8 @@
 #include <sys/ioctl.h>
 #include "defs.h"
 
+//                                     ID       NAME           MEMSIZE  CHECKSUM MASKS
+
 const struct picmicro pic18f44j10  = {0x1D20,  "PIC18F44J10", 0x2000, {0xE1,0x04,0xC7,0x0F,0x00,0x01,0x00,0x00} };
 const struct picmicro pic18f45j10  = {0x1C20,  "PIC18F45J10", 0x4000, {0xE1,0x04,0xC7,0x0F,0x00,0x01,0x00,0x00} };
 
@@ -64,7 +66,15 @@ const struct picmicro pic18f46j13  = {0x59A0,  "PIC18F46J13", 0x8000, {0xFF,0xFC
 const struct picmicro pic18f26j53  = {0x5820,  "PIC18F26J53", 0x8000, {0xFF,0xFF,0xFF,0xFF,0xFF,0xFB,0xBF,0xFB} };
 const struct picmicro pic18f46j53  = {0x58A0,  "PIC18F46J53", 0x8000, {0xFF,0xFF,0xFF,0xFF,0xFF,0xFB,0xBF,0xFB} };
 
-const struct picmicro *piclist[] = {&pic18f44j10, &pic18f45j10, &pic18f24j11, &pic18f25j11, &pic18f26j11, &pic18f44j11, &pic18f45j11, &pic18f46j11, &pic18f24j50, &pic18f25j50, &pic18f26j50, &pic18f44j50, &pic18f45j50, &pic18f46j50, &pic18f26j13, &pic18f46j13, &pic18f26j53, &pic18f46j53, NULL};
+//
+const struct picmicro pic18f27j13  = {0x5960,  "PIC18F27J13", 0x10000, {0xFF,0xFC,0xFF,0xFF,0xFF,0xFF,0xFF,0xF3} };
+const struct picmicro pic18f47j13  = {0x59E0,  "PIC18F47J13", 0x10000, {0xFF,0xFC,0xFF,0xFF,0xFF,0xFF,0xFF,0xF3} };
+
+const struct picmicro pic18f27j53  = {0x5860,  "PIC18F27J53", 0x10000, {0xFF,0xFF,0xFF,0xFF,0xFF,0xFB,0xFF,0xFB} };
+const struct picmicro pic18f47j53  = {0x58E0,  "PIC18F47J53", 0x10000, {0xFF,0xFF,0xFF,0xFF,0xFF,0xFB,0xFF,0xFB} };
+
+
+const struct picmicro *piclist[] = {&pic18f44j10, &pic18f45j10, &pic18f24j11, &pic18f25j11, &pic18f26j11, &pic18f44j11, &pic18f45j11, &pic18f46j11, &pic18f24j50, &pic18f25j50, &pic18f26j50, &pic18f44j50, &pic18f45j50, &pic18f46j50, &pic18f26j13, &pic18f46j13, &pic18f26j53, &pic18f46j53, &pic18f27j13, &pic18f47j13, &pic18f47j13, &pic18f47j53, NULL};
 
 int                mem_fd;
 void              *gpio_map;
@@ -325,7 +335,7 @@ void pic_read(const struct picmicro *pic, char *outfile)
 
 	exit_program_mode();	/* Exit Program/Verify Mode */
 
-	write_inhx8m(pm, outfile, pic);
+	write_inhx(pm, outfile, pic);
 	free_picmemory(&pm);
 }
 
@@ -337,7 +347,7 @@ void pic_write(const struct picmicro *pic, char *infile)
 	uint32_t addr = 0x00000000;
 	struct picmemory *pm;
 
-	pm = read_inhx8m(infile, pic, debug);
+	pm = read_inhx(infile, pic, debug);
 	if (!pm) return;
 
 	pic_bulk_erase();	/* Bulk erase the chip first */
@@ -436,7 +446,7 @@ void pic_blank_check(const struct picmicro *pic)
 
 	pic_goto_mem_location(0x000000);
 
-	for (addr = 0; addr < ((pic -> program_memory_size) - 4); addr++) {	/* FIXME: Ignore Flash Configuration Words ?? */
+	for (addr = 0; addr < ((pic -> program_memory_size) - 4); addr++) {
 		
 		pic_send_cmd(COMM_TABLE_READ_POST_INC);
 		data = pic_read_data();
@@ -464,7 +474,7 @@ void usage(void)
 	fprintf(stderr,
 "Usage: rppj [options]\n"
 "       -h                print help\n"
-"       -D                turn debug on\n"
+"       -D                turn ON debug\n"
 "       -g PGC,PGD,MCLR   GPIO selection, default if not present\n"
 "       -i file           input file\n"
 "       -o file           output file (ofile.hex)\n"

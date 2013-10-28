@@ -19,7 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define RPPJ_VERSION       "0.1alpha"
+#define RPPJ_VERSION       "0.2alpha"
 
 /* GPIO registers address */
 #define BCM2708_PERI_BASE  0x20000000
@@ -104,7 +104,7 @@ void usage(void);
 void setup_io(void);
 void close_io(void);
 
-/* inhx8m.c functions */
-struct picmemory *read_inhx8m(char *infile, const struct picmicro *pic, uint8_t debug);
-void write_inhx8m(struct picmemory *pm, char *outfile, const struct picmicro *pic);
+/* inhx.c functions */
+struct picmemory *read_inhx(char *infile, const struct picmicro *pic, uint8_t debug);
+void write_inhx(struct picmemory *pm, char *outfile, const struct picmicro *pic);
 
